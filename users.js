@@ -54,7 +54,13 @@ router.post("/login", async (req, res) => {
       { expiresIn: "30m" }
     );
 
-    res.cookie("token", token, { httpOnly: true, maxAge: 1800000 });
+    res.cookie("token", token, {
+      httpOnly: true,
+      maxAge: 1800000, // 30 minutes
+      secure: true,
+      sameSite: "None", // Required for cookies with secure: true
+    });
+
     res.json({ message: "Login successful" });
   } catch (error) {
     console.error("Error during login:", error);

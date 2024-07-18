@@ -29,7 +29,7 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "http://localhost:3001", // Allow requests from this origin
+    origin: "*", // Allow requests from this origin
     credentials: true, // Allow credentials (cookies) to be sent
   })
 );
