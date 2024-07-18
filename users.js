@@ -3,39 +3,25 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
+const {PrismaClient}= require("@prisma/client")
 
 router.use(bodyParser.json());
 router.use(cookieParser());
+const prisma = new PrismaClient();
 
-// In-memory user data (replace with database in real application)
-const users = [
-  {
-    email: "sourabh.munde15@gmail.com",
-    password: "password",
-    role: "user",
-    name: "Sourabh Munde",
-    age: "22",
-    mobile: "7972785704",
-  },
-  {
-    email: "sourabh.munde.18@gmail.com",
-    password: "Secret@123",
-    role: "admin",
-    name: "Sourabh Munde",
-    age: "22",
-    mobile: "7972785704",
-  },
-];
+
 
 // Middleware to authenticate user
 const authenticate = (req, res, next) => {
   const token = req.cookies.token;
+
   if (!token) {
     return res.status(401).json({ message: "No token provided" });
   }
 
   jwt.verify(token, "secret_key", (err, decoded) => {
     if (err) {
+      console.error("Failed to authenticate token:", err);
       return res.status(401).json({ message: "Failed to authenticate token" });
     }
 
@@ -45,50 +31,106 @@ const authenticate = (req, res, next) => {
   });
 };
 
-// User login route
-router.post("/login", (req, res) => {
-  const { email, password } = req.body;
-  const user = users.find((u) => u.email === email && u.password === password);
 
-  if (user) {
+// User login route
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        email: email,
+        password: password,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
     const token = jwt.sign(
       { email: user.email, role: user.role },
       "secret_key",
       { expiresIn: "30m" }
-    ); // Token expires in 3 minutes
-    res.cookie("token", token, { httpOnly: true, maxAge: 1800000 }); // Set cookie named 'token' with the JWT token
+    );
+
+    res.cookie("token", token, { httpOnly: true, maxAge: 1800000 });
     res.json({ message: "Login successful" });
-  } else {
-    res.status(401).json({ message: "Invalid credentials" });
+  } catch (error) {
+    console.error("Error during login:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
 // Get user details route
-router.get("/details", authenticate, (req, res) => {
-  const user = users.find((u) => u.email === req.userEmail);
-  if (user) {
-    const { password, ...userDetails } = user; // Exclude password from user details
-    res.json(userDetails);
-  } else {
-    res.status(404).json({ message: "User not found" });
+router.get("/details", authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        email: req.userEmail, // Fetching user based on authenticated email
+      },
+      select: {
+        id: true, // Include at least one truthy field
+        email: true,
+        name: true,
+        age: true,
+        mobile: true,
+        role: true,
+      },
+    });
+
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// Edit user details route
-router.put("/details", authenticate, (req, res) => {
-  const { name, age, mobile } = req.body;
-  const userIndex = users.findIndex((u) => u.email === req.userEmail);
 
-  if (userIndex !== -1) {
-    users[userIndex] = {
-      ...users[userIndex],
-      name: name || users[userIndex].name,
-      age: age || users[userIndex].age,
-      mobile: mobile || users[userIndex].mobile,
-    };
-    res.json({ message: "User details updated successfully" });
-  } else {
-    res.status(404).json({ message: "User not found" });
+router.post("/signup", async (req, res) => {
+  const { email, password, role, name, age, mobile } = req.body;
+
+  try {
+    // Check if the email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return res
+        .status(400)
+        .json({
+          message: "Email already exists. Please use a different email.",
+        });
+    }
+
+    // Create a new user in the database
+    const newUser = await prisma.user.create({
+      data: {
+        email,
+        password,
+        role: role || "user", // Default role is user if not provided
+        name,
+        age: parseInt(age), // Ensure age is an integer
+        mobile,
+      },
+    });
+
+    // Optionally, generate a JWT token and set it in a cookie for automatic login after signup
+
+    res
+      .status(201)
+      .json({ message: "User created successfully", user: newUser });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "An error occurred while creating the user." });
   }
 });
 

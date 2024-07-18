@@ -41,3 +41,37 @@ model Fare {
   trainId String @db.ObjectId @unique
   Train   Train @relation(fields: [trainId], references: [id])
 }
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  password  String
+  role      String
+  name      String
+  age       Int
+  mobile    String
+  bookings  Booking[]
+}
+
+model Admin {
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  email   String  @unique
+  password String
+  role    String
+  name    String
+  age     String
+  mobile  String
+}
+
+model Booking {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId    String   @unique
+  name         String
+  age          Int
+  gender       String
+  trainName    String   @map("train_name")
+  trainNumber  String   @map("train_number")
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String   @db.ObjectId
+  email        String?
+}
