@@ -1,18 +1,20 @@
+const { Prisma, PrismaClient } = require("@prisma/client");
 const express = require("express");
 const router = express.Router();
-const jwt = require("jsonwebtoken"); 
+const jwt = require("jsonwebtoken");
+const prisma = new PrismaClient();
 
-const mongoose = require("mongoose");
+// const mongoose = require("mongoose");
 
-const mongoURI = "mongodb://localhost:27017/traindata";
+// const mongoURI = "mongodb://localhost:27017/traindata";
 
-mongoose
-  .connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.log(err));
+// mongoose
+//   .connect(mongoURI, {
+//     useNewUrlParser: true,
+//     useUnifiedTopology: true,
+//   })
+//   .then(() => console.log("MongoDB connected"))
+//   .catch((err) => console.log(err));
 
 // In-memory train data (replace with database in real application)
 let trains = [
@@ -1253,15 +1255,39 @@ router.get("/", (req, res) => {
   res.json(trains);
 });
 
-// Add train route (accessible only to admins)
-router.post("/add", verifyTokenFromCookie, (req, res) => {
+router.post("/add", verifyTokenFromCookie, async (req, res) => {
   if (req.user.role !== "admin") {
     return res.status(403).json({ message: "Forbidden" });
   }
 
-  const newTrain = req.body;
-  trains.push(newTrain);
-  res.json({ message: "Train added successfully", train: newTrain });
+  const { trainName, trainNumber, dateOfAvailability, routePoints, fare } =
+    req.body;
+
+  try {
+    // Create the new train with related route points and fare
+    const newTrain = await prisma.train.create({
+      data: {
+        trainName,
+        trainNumber,
+        dateOfAvailability,
+        routePoints: {
+          create: routePoints,
+        },
+        fare: {
+          create: fare,
+        },
+      },
+      include: {
+        routePoints: true,
+        fare: true,
+      },
+    });
+
+    res.json({ message: "Train added successfully", train: newTrain });
+  } catch (error) {
+    console.error("Error adding train:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // Confirm ticket and decrease available seats
@@ -1304,12 +1330,10 @@ router.post("/confirm-ticket", verifyTokenFromCookie, (req, res) => {
     gender: passengers[0].gender,
     train_name: selectedTrain.train_name,
     train_number: selectedTrain.train_number,
-
   });
 
   res.json({ message: "Ticket booked successfully", bookingId });
 });
-
 
 router.get("/bookings", verifyTokenFromCookie, (req, res) => {
   res.json(userBookings);
@@ -1331,6 +1355,5 @@ router.delete("/bookings/:bookingId", verifyTokenFromCookie, (req, res) => {
 
   res.json({ message: "Booking deleted successfully" });
 });
-
 
 module.exports = router;

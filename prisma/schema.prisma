@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Train {
+  id                 String     @id @default(auto()) @map("_id") @db.ObjectId
+  trainName          String     @map("train_name")
+  trainNumber        String     @map("train_number")
+  dateOfAvailability String     @map("date_of_availability")
+  routePoints        RoutePoint[]
+  fare               Fare?
+}
+
+model RoutePoint {
+  id             String  @id @default(auto()) @map("_id") @db.ObjectId
+  station        String
+  departureTime  String  @map("departure_time")
+  arrivalTime    String  @map("arrival_time")
+  availableSeats Int     @map("available_seats")
+  trainId        String  @db.ObjectId
+  Train          Train   @relation(fields: [trainId], references: [id])
+}
+
+model Fare {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  SL    Int
+  AC3  Int   @map("3AC")
+  AC2  Int   @map("2AC")
+  AC1  Int   @map("1AC")
+  trainId String @db.ObjectId @unique
+  Train   Train @relation(fields: [trainId], references: [id])
+}

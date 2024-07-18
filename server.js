@@ -6,10 +6,23 @@ const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const { Prisma, PrismaClient } = require("@prisma/client");
 
 // Create Express app
 const app = express();
 const PORT = 3000;
+const prisma = new PrismaClient();
+
+const connectToDB = async () => {
+  try {
+    await prisma.$connect();
+    console.log("DB connected successfully");
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+connectToDB();
 
 // Middleware setup
 app.use(bodyParser.json());
@@ -41,6 +54,11 @@ app.use("/trains", verifyTokenFromCookie, require("./trains"));
 // Protected route example
 app.get("/protected", verifyTokenFromCookie, (req, res) => {
   res.json({ message: "Protected endpoint accessed successfully" });
+});
+
+app.get("/test", (req, res) => {
+  const resp = prisma.train.findMany();
+  console.log(resp);
 });
 
 // Start server
